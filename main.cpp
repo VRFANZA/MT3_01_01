@@ -156,8 +156,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// センサーの角度（degree）をradianに変換してVector3に反映
 		// 60で割ってるのは6.0fで1回転で数値をそのまま入れるとめっちゃ回転するから
 		rotate = {
-			(sensorData[2] * (3.141592f / 180.0f)) / 60.0f, // pitch → X
-			(sensorData[1] + 180.0f * (3.141592f / 180.0f)) / 60.0f, // heading → Y
+			(sensorData[1] * (3.141592f / 180.0f)) / 60.0f, // pitch → X
+			(sensorData[2] + 180.0f * (3.141592f / 180.0f)) / 60.0f, // heading → Y
 			(sensorData[3] + 180.0f * (3.141592f / 180.0f)) / 60.0f  // roll → Z
 		};
 
@@ -204,8 +204,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		);
 
 		// センサー取得地の値を画面に描画する（左上に表示）
-		Novice::ScreenPrintf(10, 10, "Pitch(x): %f", sensorData[2]);
-		Novice::ScreenPrintf(10, 30, "Heading(y): %f", sensorData[1]);
+		Novice::ScreenPrintf(10, 10, "Pitch(x): %f", sensorData[1]);
+		Novice::ScreenPrintf(10, 30, "Heading(y): %f", sensorData[2]);
 		Novice::ScreenPrintf(10, 50, "Roll(z):  %f", sensorData[3]);
 
 		///
