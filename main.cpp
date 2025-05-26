@@ -3,6 +3,9 @@
 #include <Vector3.h>
 #include <Matrix4x4.h>
 #include <assert.h>
+#include <sstream>
+#include <vector>
+#include "SerialReader.h"
 
 const char kWindowTitle[] = "LE2B_16_タカムラシュン_MT3_01_01";
 
@@ -97,11 +100,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Novice::Initialize(kWindowTitle, 1280, 720);
 
 	// キー入力結果を受け取る箱
-	char keys[256] = {0};
-	char preKeys[256] = {0};
+	char keys[256] = { 0 };
+	char preKeys[256] = { 0 };
 
-	Vector3 rotate{0.0f,0.0f,0.0f};
-	Vector3 translate{0.0f,0.0f,0.0f};
+	// グローバル or 上部で宣言
+	SerialReader* serial = nullptr;
+	float sensorData[10] = { 0.0f,0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+
+	// WinMain の初期化部分
+	serial = new SerialReader("COM4");  // ArduinoのCOMポート
+
+	Vector3 rotate{ 0.0f,0.0f,0.0f };
+	Vector3 translate{ 0.0f,0.0f,0.0f };
 
 	// ウィンドウの×ボタンが押されるまでループ
 	while (Novice::ProcessMessage() == 0) {
@@ -115,6 +125,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		///
 		/// ↓更新処理ここから
 		///
+
+		//	センサーデータを取得して格納
+		std::string line;
+		if (serial->readLine(line)) {
+			std::istringstream ss(line);
+			std::string token;
+			for (int i = 0; std::getline(ss, token, ',') && i < 10; ++i) {
+				sensorData[i] = std::stof(token);
+			}
+		}
 
 		// ここに操作を記述
 		if (keys[DIK_W]) {
@@ -133,25 +153,30 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			translate.x += 0.1f;
 		}
 
-		rotate.y += 0.1f;
+		// センサーの角度（degree）をradianに変換してVector3に反映
+		rotate = {
+			(sensorData[2] * (3.141592f / 180.0f)) / 60.0f, // pitch → X
+			(sensorData[1] + 180.0f * (3.141592f / 180.0f)) / 60.0f, // heading → Y
+			(sensorData[3] + 180.0f * (3.141592f / 180.0f)) / 60.0f  // roll → Z
+		};
 
 		Matrix4x4 worldMatrix = MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, rotate, translate);
-		
-		Matrix4x4 cameraMatrix = 
-			MakeAffineMatrix({1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,-10.0f});
-		
-		Matrix4x4 viewMatrix = 
+
+		Matrix4x4 cameraMatrix =
+			MakeAffineMatrix({ 1.0f,1.0f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.0f,0.0f,-10.0f });
+
+		Matrix4x4 viewMatrix =
 			Inverse(cameraMatrix);
-		
+
 		Matrix4x4 projectionMatrix =
 			MakePerspectiveFovMatrix(0.45f, kWindowWidth / kWindowHeight, 0.1f, 100.0f);
-		
+
 		Matrix4x4 worldViewProjectionMatrix =
 			Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
-		
+
 		Matrix4x4 viewportMatrix =
 			MakeViewportMatrix(0, 0, kWindowWidth, kWindowHeight, 0.0f, 1.0f);
-		
+
 		Vector3 screenVertices[3];
 		Vector3 kLocalVertices[3] = { {0.0f,1.0f,0.0f},{1.0f,-1.0f,0.0f},{-1.0f,-1.0f,0.0f} };
 		for (uint32_t i = 0; i < 3; ++i) {
@@ -176,6 +201,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			static_cast<int>(screenVertices[2].y),
 			RED, kFillModeSolid
 		);
+
+		Novice::ScreenPrintf(0, 0, "%f", rotate.y);
+
+		// Headingの値を画面に描画する（左上に表示）
+		Novice::ScreenPrintf(10, 10, "Heading: %f", sensorData[1]);
+
+		// PitchとRollも一緒に表示
+		Novice::ScreenPrintf(10, 30, "Pitch: %f", sensorData[2]);
+		Novice::ScreenPrintf(10, 50, "Roll:  %f", sensorData[3]);
+
 
 		///
 		/// ↑描画処理ここまで
@@ -419,7 +454,7 @@ Matrix4x4 MakeAffineMatrix(Vector3 scale, Vector3 rotate, Vector3 translate)
 	// 上で作った行列からアフィン行列を作る
 	// アフィン行列の作成（スケール→回転→移動の順）
 	Matrix4x4 affineMatrix4x4;
-	affineMatrix4x4 = Multiply(scaleMatrix4x4,Multiply(rotateMatrix4x4, translateMatrix4x4));
+	affineMatrix4x4 = Multiply(scaleMatrix4x4, Multiply(rotateMatrix4x4, translateMatrix4x4));
 
 	return  affineMatrix4x4;
 }
